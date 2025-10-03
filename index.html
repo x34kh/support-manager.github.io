@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Support Queue Visualization</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .sidebar {
+            width: 300px;
+            background: #2d2d2d;
+            padding: 20px;
+            border-right: 1px solid #444;
+            overflow-y: auto;
+        }
+
+        .sidebar h2 {
+            margin-bottom: 20px;
+            color: #4a9eff;
+            font-size: 18px;
+        }
+
+        .control-group {
+            margin-bottom: 25px;
+            padding: 15px;
+            background: #363636;
+            border-radius: 8px;
+        }
+
+        .control-group h3 {
+            margin-bottom: 15px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .control-item {
+            margin-bottom: 15px;
+        }
+
+        .control-item label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 12px;
+            color: #ccc;
+        }
+
+        .control-item input[type="range"] {
+            width: 100%;
+            margin-bottom: 5px;
+        }
+
+        .control-item input[type="number"], .control-item select {
+            width: 100%;
+            padding: 8px;
+            background: #4a4a4a;
+            border: 1px solid #666;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 12px;
+        }
+
+        .control-item select option {
+            background: #4a4a4a;
+            color: #fff;
+        }
+
+        .value-display {
+            font-size: 12px;
+            color: #4a9eff;
+            font-weight: 600;
+        }
+
+        .engineer-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .engineer-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            margin-bottom: 5px;
+            background: #4a4a4a;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .engineer-item:hover {
+            background: #555;
+        }
+
+        .engineer-item.selected {
+            background: #4a9eff;
+        }
+
+        .engineer-name {
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .engineer-speed {
+            font-size: 11px;
+            color: #ccc;
+        }
+
+        .severity-breakdown {
+            font-size: 10px;
+            color: #4a9eff;
+            margin-top: 3px;
+        }
+
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            background: #1a1a1a;
+        }
+
+        canvas {
+            display: block;
+            background: #1a1a1a;
+        }
+
+        .stats {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(45, 45, 45, 0.9);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            min-width: 200px;
+        }
+
+        .stats h3 {
+            margin-bottom: 10px;
+            color: #4a9eff;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(45, 45, 45, 0.9);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 12px;
+        }
+
+        .legend h3 {
+            margin-bottom: 10px;
+            color: #4a9eff;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        button {
+            background: #4a9eff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #3a8eef;
+        }
+
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+
+        /* Popup Styles */
+        .popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .popup-content {
+            background: #2d2d2d;
+            border-radius: 8px;
+            width: 500px;
+            height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .popup-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            border-bottom: 1px solid #444;
+        }
+
+        .popup-header h3 {
+            color: #4a9eff;
+            margin: 0;
+        }
+
+        .popup-close {
+            background: none;
+            border: none;
+            color: #ccc;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .popup-close:hover {
+            color: #fff;
+            background: #444;
+            border-radius: 4px;
+        }
+
+        .popup-body {
+            padding: 20px;
+            height: calc(90vh - 80px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .queue-section {
+            margin-bottom: 30px;
+        }
+
+        .queue-section h4 {
+            color: #fff;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
+        .task-list {
+            height: 100%;
+            overflow-y: auto;
+        }
+
+        .task-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            margin-bottom: 5px;
+            background: #363636;
+            border-radius: 4px;
+            border-left: 4px solid;
+        }
+
+        .task-item.severity-1 {
+            border-left-color: #ff1744; /* Critical - Bright Red */
+        }
+
+        .task-item.severity-2 {
+            border-left-color: #ff6b6b; /* High - Orange Red */
+        }
+
+        .task-item.severity-3 {
+            border-left-color: #ffa500; /* Medium - Orange */
+        }
+
+        .task-item.severity-4 {
+            border-left-color: #4caf50; /* Low - Green */
+        }
+
+        .task-item.preempted {
+            background: #3a3a1a;
+            border-left-style: dashed;
+        }
+
+        .task-info {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-width: 0; /* Allow flex item to shrink below content size */
+        }
+
+        .task-id {
+            font-weight: bold;
+            color: #4a9eff;
+            font-size: 14px;
+        }
+
+        .task-details {
+            font-size: 12px;
+            color: #ccc;
+            margin-top: 2px;
+        }
+
+        .task-severity {
+            background: #4a4a4a;
+            color: #fff;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .empty-queue {
+            text-align: center;
+            color: #999;
+            font-style: italic;
+            padding: 20px;
+        }
+
+        /* Tab Styles */
+        .tab-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .tab-buttons {
+            display: flex;
+            border-bottom: 2px solid #444;
+            margin-bottom: 0;
+        }
+
+        .tab-button {
+            background: #4a4a4a;
+            color: #ccc;
+            border: none;
+            padding: 12px 20px;
+            cursor: pointer;
+            border-radius: 8px 8px 0 0;
+            margin-right: 2px;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab-button:hover {
+            background: #555;
+            color: #fff;
+        }
+
+        .tab-button.active {
+            background: #4a9eff;
+            color: #fff;
+            border-bottom-color: #4a9eff;
+        }
+
+        .tab-content {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .tab-panel {
+            display: none;
+            padding-top: 15px;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .tab-panel.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .tab-panel .task-list {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .task-progress {
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .progress-bar {
+            flex: 1;
+            height: 6px;
+            background: #4a4a4a;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4a9eff, #00e676);
+            border-radius: 3px;
+            transition: width 0.1s ease;
+        }
+
+        .task-item.severity-1 .progress-fill {
+            background: linear-gradient(90deg, #ff1744, #ff6b6b); /* Critical - Red gradient */
+        }
+
+        .task-item.severity-2 .progress-fill {
+            background: linear-gradient(90deg, #ff6b6b, #ff9999); /* High - Orange-red gradient */
+        }
+
+        .task-item.severity-3 .progress-fill {
+            background: linear-gradient(90deg, #ffa500, #ffcc66); /* Medium - Orange gradient */
+        }
+
+        .task-item.severity-4 .progress-fill {
+            background: linear-gradient(90deg, #4caf50, #81c784); /* Low - Green gradient */
+        }
+
+        .progress-text {
+            font-size: 11px;
+            color: #4a9eff;
+            font-weight: bold;
+            min-width: 35px;
+            text-align: right;
+        }
+        /* Action Bar Styles */
+        .action-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: rgba(30, 30, 30, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid #444;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            padding: 0 20px;
+            z-index: 1000;
+        }
+
+        .action-button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            min-width: 120px;
+        }
+
+        .action-button.negative {
+            background: rgba(255, 107, 107, 0.2);
+            color: #ff6b6b;
+            border: 1px solid rgba(255, 107, 107, 0.3);
+        }
+
+        .action-button.negative:hover {
+            background: rgba(255, 107, 107, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .action-button.positive {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4caf50;
+            border: 1px solid rgba(76, 175, 80, 0.3);
+        }
+
+        .action-button.positive:hover {
+            background: rgba(76, 175, 80, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .container {
+            margin-top: 60px; /* Account for fixed action bar */
+        }
+
+        /* Tooltip Styles */
+        .action-button {
+            position: relative;
+        }
+
+        .action-button .tooltip {
+            visibility: hidden;
+            opacity: 0;
+            position: absolute;
+            bottom: -45px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: normal;
+            white-space: nowrap;
+            z-index: 1001;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .action-button .tooltip::before {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-bottom: 5px solid rgba(0, 0, 0, 0.9);
+        }
+
+        .action-button:hover .tooltip {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="action-bar">
+        <button class="action-button negative" id="minorIncident">
+            Minor Incident
+            <div class="tooltip">Generates 5 Severity 1 (Critical) tasks with normal complexity distribution</div>
+        </button>
+        <button class="action-button negative" id="moderateIncident">
+            Moderate Incident
+            <div class="tooltip">Generates 10 Severity 1 (Critical) tasks - creates significant workload spike</div>
+        </button>
+        <button class="action-button negative" id="majorIncident">
+            Major Incident
+            <div class="tooltip">Generates 20 Severity 1 (Critical) tasks - major system stress test</div>
+        </button>
+        <button class="action-button positive" id="training">
+            Training
+            <div class="tooltip">Assigns 1-hour training task to each engineer - increases performance by 0.1x after completion</div>
+        </button>
+    </div>
+    <div class="container">
+        <div class="sidebar">
+            <h2>Queue Configuration</h2>
+            
+            <div class="control-group">
+                <h3>Engineers</h3>
+                <div class="control-item">
+                    <label>Number of Engineers</label>
+                    <input type="range" id="engineerCount" min="1" max="10" value="3">
+                    <div class="value-display" id="engineerCountValue">3</div>
+                </div>
+                <div class="engineer-list" id="engineerList"></div>
+            </div>
+
+            <div class="control-group">
+                <h3>Task Settings</h3>
+                <div class="control-item">
+                    <label>Distribution Model</label>
+                    <select id="distributionModel">
+                        <option value="round-robin">Round Robin</option>
+                        <option value="least-occupied">Least Occupied</option>
+                    </select>
+                </div>
+                <div class="control-item">
+                    <label>Tasks per Day (24/7)</label>
+                    <input type="range" id="taskRate" min="1" max="50" step="1" value="10">
+                    <div class="value-display" id="taskRateValue">10</div>
+                </div>
+                <div class="control-item">
+                    <label>Min Complexity (simulated time)</label>
+                    <input type="range" id="minComplexity" min="0.5" max="12" step="0.25" value="0.5">
+                    <div class="value-display" id="minComplexityValue">30 min</div>
+                </div>
+                <div class="control-item">
+                    <label>Max Complexity (simulated time)</label>
+                    <input type="range" id="maxComplexity" min="1" max="12" step="0.5" value="12">
+                    <div class="value-display" id="maxComplexityValue">12 hours</div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Severity Distribution</h3>
+                <div class="control-item">
+                    <label>Distribution Mode</label>
+                    <select id="severityDistributionMode">
+                        <option value="normal">Normal Distribution</option>
+                        <option value="custom">Custom</option>
+                    </select>
+                </div>
+                
+                <!-- Normal Distribution Controls -->
+                <div id="normalDistributionControls">
+                    <div class="control-item">
+                        <label>Distribution Shift (toward higher severity)</label>
+                        <input type="range" id="normalDistributionShift" min="-2" max="2" step="0.1" value="-1">
+                        <div class="value-display" id="normalDistributionShiftValue">-1.0</div>
+                    </div>
+                    <div class="control-item">
+                        <label>Current Distribution Preview</label>
+                        <div class="value-display" id="normalDistributionPreview">S1: 7% | S2: 24% | S3: 38% | S4: 31%</div>
+                    </div>
+                </div>
+                
+                <!-- Custom Distribution Controls -->
+                <div id="customDistributionControls" style="display: none;">
+                    <div class="control-item">
+                        <label>Severity 1 (Critical) - %</label>
+                        <input type="range" id="severity1Chance" min="0" max="50" step="1" value="10">
+                        <div class="value-display" id="severity1Value">10%</div>
+                    </div>
+                    <div class="control-item">
+                        <label>Severity 2 (High) - %</label>
+                        <input type="range" id="severity2Chance" min="0" max="50" step="1" value="20">
+                        <div class="value-display" id="severity2Value">20%</div>
+                    </div>
+                    <div class="control-item">
+                        <label>Severity 3 (Medium) - %</label>
+                        <input type="range" id="severity3Chance" min="0" max="50" step="1" value="30">
+                        <div class="value-display" id="severity3Value">30%</div>
+                    </div>
+                    <div class="control-item">
+                        <label>Severity 4 (Low) - %</label>
+                        <input type="range" id="severity4Chance" min="0" max="100" step="1" value="40">
+                        <div class="value-display" id="severity4Value">40%</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Engineer Performance</h3>
+                <div id="engineerControls" style="display: none;">
+                    <div class="control-item">
+                        <label>Selected Engineer Speed</label>
+                        <input type="range" id="engineerSpeed" min="0.5" max="3" step="0.1" value="1">
+                        <div class="value-display" id="engineerSpeedValue">1.0x</div>
+                    </div>
+                </div>
+                <div id="noEngineerSelected">
+                    <p style="color: #999; font-size: 12px;">Click on an engineer to adjust their performance</p>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Time Settings</h3>
+                <div class="control-item">
+                    <label>Time Speed</label>
+                    <input type="range" id="timeSpeed" min="0.1" max="10" step="0.1" value="1">
+                    <div class="value-display" id="timeSpeedValue">1.0x (60s = 1 day)</div>
+                </div>
+                <div class="control-item">
+                    <label>Current Time</label>
+                    <div class="value-display" id="currentTime">Day 0, 00:00</div>
+                </div>
+                <div class="control-item">
+                    <label>Work Status</label>
+                    <div class="value-display" id="workStatus">Working Hours</div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Simulation</h3>
+                <button id="pauseBtn">Pause</button>
+                <button id="resetBtn">Reset</button>
+            </div>
+        </div>
+
+        <div class="canvas-container">
+            <canvas id="gameCanvas"></canvas>
+            
+            <div class="stats">
+                <h3>Statistics</h3>
+                <div class="stat-item">
+                    <span>Active Tasks:</span>
+                    <span id="activeTasks">0</span>
+                </div>
+                <div class="stat-item">
+                    <span>Completed Tasks:</span>
+                    <span id="completedTasks">0</span>
+                </div>
+                <div class="stat-item">
+                    <span>Average Total Time:</span>
+                    <span id="avgQueueTime">0.0s</span>
+                </div>
+                <div class="stat-item">
+                    <span>Tasks/Min:</span>
+                    <span id="tasksPerMin">0</span>
+                </div>
+            </div>
+
+            <div class="legend">
+                <h3>Workday Simulation</h3>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ff1744;"></div>
+                    <span>Severity 1 (Critical)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ff6b6b;"></div>
+                    <span>Severity 2 (High)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ffa500;"></div>
+                    <span>Severity 3 (Medium)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #4caf50;"></div>
+                    <span>Severity 4 (Low)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #666666;"></div>
+                    <span>Engineer (Inactive - After Hours)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #4a9eff;"></div>
+                    <span>Engineer (Idle - Available)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #00e676;"></div>
+                    <span>Engineer (Working)</span>
+                </div>
+                <div style="margin-top: 10px; font-size: 11px; color: #999;">
+                    • Tasks spawn 24/7, engineers work 9 AM - 5 PM<br>
+                    • Default: 10 tasks/day, 60s = 1 day<br>
+                    • Tasks queue overnight for next business day
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Engineer Queue Popup -->
+    <div id="engineerPopup" class="popup-overlay" style="display: none;">
+        <div class="popup-content">
+            <div class="popup-header">
+                <h3 id="popupEngineerName">Engineer Queue</h3>
+                <button class="popup-close" onclick="closeEngineerPopup()">&times;</button>
+            </div>
+            <div class="popup-body">
+                <div class="tab-container">
+                    <div class="tab-buttons">
+                        <button class="tab-button active" data-tab="pending">
+                            Pending (<span id="pendingCount">0</span>)
+                        </button>
+                        <button class="tab-button" data-tab="incoming">
+                            Incoming (<span id="incomingCount">0</span>)
+                        </button>
+                        <button class="tab-button" data-tab="completed">
+                            Completed (<span id="completedCount">0</span>)
+                        </button>
+                    </div>
+                    
+                    <div class="tab-content">
+                        <div id="pendingTab" class="tab-panel active">
+                            <div id="pendingTasks" class="task-list"></div>
+                        </div>
+                        <div id="incomingTab" class="tab-panel">
+                            <div id="incomingTasks" class="task-list"></div>
+                        </div>
+                        <div id="completedTab" class="tab-panel">
+                            <div id="completedTasks" class="task-list"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="simulation.js"></script>
+</body>
+</html>
